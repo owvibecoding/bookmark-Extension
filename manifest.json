@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Browser History & Bookmarks Reader",
+  "version": "1.1",
+  "description": "A Chrome extension to read browser history and bookmarks",
+  "permissions": [
+    "history",
+    "bookmarks",
+    "tabs",
+    "downloads"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  }
+} 
