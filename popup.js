@@ -203,6 +203,117 @@ async function exportAsMarkdown() {
   setButtonsState(false);
 }
 
+// Function to export all open tabs from all windows as JSON
+async function exportTabsAsJson() {
+  setButtonsState(true);
+  
+  try {
+    // Get all windows with their tabs
+    const windows = await chrome.windows.getAll({ populate: true });
+    
+    // Function to get the last visit time for a URL
+    async function getTabOpenTime(url) {
+      try {
+        const historyItems = await chrome.history.search({
+          text: url,
+          maxResults: 1
+        });
+        
+        if (historyItems.length > 0) {
+          return {
+            lastVisitTime: historyItems[0].lastVisitTime,
+            lastVisitDate: new Date(historyItems[0].lastVisitTime).toISOString(),
+            visitCount: historyItems[0].visitCount
+          };
+        }
+        return {
+          lastVisitTime: null,
+          lastVisitDate: null,
+          visitCount: 0
+        };
+      } catch (error) {
+        console.warn(`Could not get history for ${url}:`, error);
+        return {
+          lastVisitTime: null,
+          lastVisitDate: null,
+          visitCount: 0
+        };
+      }
+    }
+    
+    // Collect all tabs with their history information
+    const windowsWithHistory = await Promise.all(
+      windows.map(async (window) => {
+        const tabsWithHistory = await Promise.all(
+          window.tabs.map(async (tab) => {
+            const historyInfo = await getTabOpenTime(tab.url);
+            return {
+              id: tab.id,
+              index: tab.index,
+              windowId: tab.windowId,
+              url: tab.url,
+              title: tab.title,
+              favIconUrl: tab.favIconUrl,
+              active: tab.active,
+              pinned: tab.pinned,
+              highlighted: tab.highlighted,
+              incognito: tab.incognito,
+              audible: tab.audible,
+              discarded: tab.discarded,
+              autoDiscardable: tab.autoDiscardable,
+              mutedInfo: tab.mutedInfo,
+              status: tab.status,
+              // Add timing information
+              lastVisitTime: historyInfo.lastVisitTime,
+              lastVisitDate: historyInfo.lastVisitDate,
+              visitCount: historyInfo.visitCount,
+              // Add human-readable format
+              openedAt: historyInfo.lastVisitDate ? formatDate(historyInfo.lastVisitTime) : 'Unknown'
+            };
+          })
+        );
+        
+        return {
+          windowId: window.id,
+          windowType: window.type,
+          incognito: window.incognito,
+          focused: window.focused,
+          state: window.state,
+          tabCount: window.tabs.length,
+          tabs: tabsWithHistory
+        };
+      })
+    );
+    
+    // Structure the data for export
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      exportTimestamp: Date.now(),
+      totalWindows: windows.length,
+      totalTabs: windows.reduce((total, window) => total + window.tabs.length, 0),
+      note: "lastVisitTime represents the most recent visit to the URL, which is typically close to when the tab was opened",
+      windows: windowsWithHistory
+    };
+    
+    // Create and trigger download
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `open-tabs-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    console.log('Exported tabs data:', exportData);
+  } catch (error) {
+    console.error('Error exporting tabs:', error);
+    alert('Error exporting tabs: ' + error.message);
+  } finally {
+    setButtonsState(false);
+  }
+}
+
 // Initialize the popup
 document.addEventListener('DOMContentLoaded', function() {
   //displayTabs();
@@ -213,4 +324,5 @@ document.addEventListener('DOMContentLoaded', function() {
   // Add event listeners for buttons
   document.getElementById('exportButton').addEventListener('click', exportAsMarkdown);
   document.getElementById('downloadButton').addEventListener('click', exportAsMarkdown);
+  document.getElementById('exportTabsJsonButton').addEventListener('click', exportTabsAsJson);
 }); 
