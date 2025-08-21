@@ -191,13 +191,62 @@ async function exportAllAsJson() {
     const tabsWithHistory = await collectAllTabsWithHistory(allTabs);
     const historyItems = await fetchAllHistory();
 
+    // Remove duplicate history by URL and count visits
+    const historyMap = new Map();
+    historyItems.forEach(item => {
+      if (historyMap.has(item.url)) {
+        const entry = historyMap.get(item.url);
+        entry.count += 1;
+        if (item.lastVisitTime > entry.lastVisitTime) {
+          entry.lastVisitTime = item.lastVisitTime;
+          entry.title = item.title;
+        }
+      } else {
+        historyMap.set(item.url, {
+          url: item.url,
+          title: item.title,
+          lastVisitTime: item.lastVisitTime,
+          count: 1
+        });
+      }
+    });
+    const uniqueHistory = Array.from(historyMap.values());
+
+    // Collect bookmarks (flat list)
+    function flattenBookmarks(nodes, arr = []) {
+      nodes.forEach(node => {
+        if (node.url) {
+          arr.push({
+            id: node.id,
+            title: node.title,
+            url: node.url,
+            dateAdded: node.dateAdded ? new Date(node.dateAdded).toISOString() : null,
+            parentId: node.parentId || null
+          });
+        }
+        if (node.children) {
+          flattenBookmarks(node.children, arr);
+        }
+      });
+      return arr;
+    }
+    const bookmarkTreeNodes = await chrome.bookmarks.getTree();
+    const bookmarks = flattenBookmarks(bookmarkTreeNodes);
+
+    // Mark tabs as open
+    const openTabs = tabsWithHistory.map(tab => ({
+      ...tab,
+      state: "open"
+    }));
+
     const exportData = {
       exportDate: new Date().toISOString(),
       exportTimestamp: Date.now(),
       totalWindows: windows.length,
       totalTabs: allTabs.length,
-      tabs: tabsWithHistory,
-      history: historyItems
+      tabs: openTabs,
+      history: uniqueHistory,
+      bookmarks: bookmarks
     };
 
     downloadFile(
@@ -212,7 +261,6 @@ async function exportAllAsJson() {
     setButtonsState(false);
   }
 }
-
 
 // Update counts in popup
 async function updateCounts() {
