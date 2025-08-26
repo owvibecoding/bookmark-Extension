@@ -282,6 +282,45 @@ async function updateCounts() {
   });
 }
 
+
+async function exportTabsAsMarkdown() {
+  setButtonsState(true);
+  try {
+    const windows = await chrome.windows.getAll({ populate: true });
+    const allTabs = windows.flatMap(window => window.tabs);
+    const tabsWithHistory = await collectAllTabsWithHistory(allTabs);
+
+    // Mark tabs as open
+    const openTabs = tabsWithHistory.map(tab => ({
+      ...tab,
+      state: "open"
+    }));
+
+    // Build Markdown output
+    let md = `# Exported Tabs\n\n`;
+    md += `- **Export Date:** ${new Date().toISOString()}\n`;
+    md += `- **Total Windows:** ${windows.length}\n`;
+    md += `- **Total Tabs:** ${allTabs.length}\n\n`;
+    md += `## Tabs\n\n`;
+
+    openTabs.forEach((tab, i) => {
+      md += `${i + 1}. [${tab.title || "No Title"}](${tab.url})  \n`;
+    });
+
+    downloadFile(
+      md,
+      `tabs-export-${new Date().toISOString().split("T")[0]}.md`
+    );
+
+    console.log("Exported tabs as Markdown:\n", md);
+  } catch (error) {
+    console.error("Error exporting tabs:", error);
+    alert("Error exporting tabs: " + error.message);
+  } finally {
+    setButtonsState(false);
+  }
+}
+
 // Initialize popup
 document.addEventListener('DOMContentLoaded', function() {
   updateCounts();
@@ -289,4 +328,5 @@ document.addEventListener('DOMContentLoaded', function() {
   // document.getElementById('downloadButton').addEventListener('click', exportAsMarkdown);
   // document.getElementById('exportTabsJsonButton').addEventListener('click', exportTabsAsJson);
    document.getElementById('exportAllJsonButton').addEventListener('click', exportAllAsJson);
+   document.getElementById('exportTabsMDButton').addEventListener('click', exportTabsAsMarkdown);
 });
